@@ -36,21 +36,23 @@ public class TicketService : ITicketService
 
         var paginationResult = PaginationResult<TicketDto>.Success(ticketDtos, totalTickets, query.PageNumber, query.PageSize);
 
-        return new(true, StatusCodes.Status200OK , "Data Loading successfully", paginationResult);
-        
+        return new(true, StatusCodes.Status200OK, "Data Loading successfully", paginationResult);
+
     }
 
     public async Task<GenericBaseResponse<int>> CreateTicketAsync(CreateTicketCommand command)
     {
         var ticket = _mapper.Map<Ticket>(command);
+        ticket.CreationDate = DateTime.UtcNow;
+        ticket.Status = TicketStatus.New;
 
         using var transaction = _unitOfWork.BeginTransaction();
         try
         {
-            var createdTicket = _unitOfWork.Tickets.AddAsync(ticket);
+            await _unitOfWork.Tickets.AddAsync(ticket);
             await _unitOfWork.SaveChangesAsync();
             transaction.Commit();
-            return new(true, StatusCodes.Status200OK, "created successfully", createdTicket.Id);
+            return new(true, StatusCodes.Status200OK, "created successfully");
         }
         catch (Exception ex)
         {
@@ -87,17 +89,33 @@ public class TicketService : ITicketService
     public async Task UpdateTicketStatusesAsync()
     {
         var tickets = await _unitOfWork.Tickets.GetAll().ToListAsync();
+        var currentTime = DateTime.UtcNow;
+        var tasks = new List<Task>();
 
         foreach (var ticket in tickets)
         {
-            var timeElapsed = DateTime.UtcNow - ticket.CreationDate;
+            var timeElapsed = currentTime - ticket.CreationDate;
 
+            if (timeElapsed.TotalMinutes >= 30 && ticket.Status == TicketStatus.New)
+            {
+                ticket.Status = TicketStatus.InProgress;
+                tasks.Add(UpdateTicketAsync(ticket));
+
+            }
             if (timeElapsed.TotalMinutes >= 60 && ticket.Status != TicketStatus.Handled)
             {
                 ticket.Status = TicketStatus.Handled;
-                await UpdateTicketAsync(ticket);
+                tasks.Add(UpdateTicketAsync(ticket));
+            }
+            else if (timeElapsed.TotalDays >= 7 && ticket.Status == TicketStatus.Handled)
+            {
+                ticket.Status = TicketStatus.Closed;
+                tasks.Add(UpdateTicketAsync(ticket));
             }
         }
+
+        await Task.WhenAll(tasks);
+
     }
 
     public async Task<GenericBaseResponse<string>> UpdateTicketAsync(Ticket ticket)

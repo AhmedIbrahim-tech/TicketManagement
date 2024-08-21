@@ -1,4 +1,5 @@
 ﻿using Domain.Entities;
+using Domain.Enums;
 using Infrastructure.Context;
 using Infrastructure.GenericRepository;
 using Microsoft.EntityFrameworkCore;
@@ -23,15 +24,13 @@ namespace Infrastructure.Repositories
 
         public async Task<IEnumerable<Ticket>> GetPagedTicketsAsync(int pageNumber, int pageSize)
         {
+            var currentTime = DateTime.UtcNow;
             var tickets = await _context.Tickets
                 .AsNoTracking()
                 .OrderBy(t => t.CreationDate)
                 .Skip((pageNumber - 1) * pageSize)
                 .Take(pageSize)
                 .ToListAsync();
-
-            tickets.ForEach(ticket => ticket.Color = ticket.CalculateTicketColor());
-
             return tickets;
         }
 

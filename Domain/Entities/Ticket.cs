@@ -7,6 +7,7 @@ public class Ticket
     public Ticket()
     {
         Status = (int)TicketStatus.New;
+        CreationDate = DateTime.Now;
     }
     public int Id { get; set; }
     public DateTime CreationDate { get; set; }
@@ -15,20 +16,21 @@ public class Ticket
     public string City { get; set; }
     public string District { get; set; }
     public TicketStatus Status { get; set; }
-
-    public TicketColor Color { get; set; }
-
-    public TicketColor CalculateTicketColor()
+    public TicketColor Color => CalculateTicketColor();
+    private TicketColor CalculateTicketColor()
     {
-        var timeElapsed = DateTime.UtcNow - CreationDate;
+        var timeElapsed = (DateTime.UtcNow - CreationDate).TotalMinutes;
 
-        if (timeElapsed.TotalMinutes < 15)
+        if (timeElapsed < 15)
             return TicketColor.Yellow;
-        else if (timeElapsed.TotalMinutes < 30)
+
+        if (timeElapsed < 30)
             return TicketColor.Green;
-        else if (timeElapsed.TotalMinutes < 45)
+        
+        if (timeElapsed < 45)
             return TicketColor.Blue;
-        else
-            return TicketColor.Red;
+
+        return TicketColor.Red;
     }
+
 }
